@@ -3,8 +3,8 @@
 (def node-store (atom #{}))
 (def user-charts (atom #{}))
 
-;; ... I think each Clojure "agent" will live within the one
-;; FloWr "user" so this is truly a global variable.
+;; ... every "agent" in the Clojure world will be associated with one
+;; FloWr backend, and one FloWr "user".
 
 ;; It is useful to have this separated out, otherwise we run into
 ;; trouble when loading the code w/o an internet connection.
