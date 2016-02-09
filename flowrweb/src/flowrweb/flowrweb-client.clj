@@ -1,30 +1,102 @@
-;; Note: from a design standpoint these are truly global variables
+;;; Local data storage
+
+;; Note: from a design standpoint these are truly global variables, see notes below.
 
 (def node-store (atom #{}))
 (def user-charts (atom #{}))
+(def type-store (atom #{}))
 
-;; ... every "agent" in the Clojure world will be associated with one
+;; Every "agent" in the Clojure world will be associated with one
 ;; FloWr backend, and one FloWr "user".
+
+;;; Initialisation
 
 ;; It is useful to have this separated out, otherwise we run into
 ;; trouble when loading the code w/o an internet connection.
 ;; (Most functions will give an error if not online.  It would
 ;; probably be useful to have a spoofed "upstream backend" for testing
 ;; but that's quite a bit of work.)
-(defn init-local []
-  "Reset the local cached information about nodes and charts."
-  (reset! node-store (list-all-nodes))
-  (reset! user-charts  (list-user-charts)))
+
+(defn init-local 
+  "Reset the local cached information about nodes, charts, and node type data."
+  []
+  (binding [*print-length* 3]
+    (reset! node-store (list-all-nodes))
+    (reset! user-charts  (list-user-charts))
+    (reset! type-store (map #(let [nodetype (:TYPE %)]
+                               (conj (node-type-info nodetype)
+                                     [:TYPE nodetype]))
+                            @node-store))))
+
+(defn save-local 
+  "Spit the data into a local file."
+  []
+  (binding [*print-length* nil]
+    (spit "flowr-data.clj" (prn-str @node-store))
+    (spit "flowr-data.clj" (prn-str @user-charts) :append true)
+    (spit "flowr-data.clj" (prn-str @type-store) :append true)))
+
+(defn reinit-local 
+  "Initialise the local variables from information stored in a file.
+This avoids pinging the API."
+  []
+  (let [data (str/split-lines (slurp "flowr-data.clj"))]
+    (reset! node-store (edn/read-string (nth data 0)))
+    (reset! user-charts (edn/read-string (nth data 1)))
+    (reset! type-store (edn/read-string (nth data 2)))))
+
+;;; Querying the local info store
 
 ;; I think this should be exactly the nodes that are in the "retriever" name space.
 ;; Am I right about that?  If so, the API information needs updating.
+
 (defn chart-starting-nodes
-  "List the names of nodes that the API says are valid for use when starting a chart."
+  "List the names of nodes that the API has indicated to be valid for use when starting a chart."
   []
   (let [nodes @node-store]
     (map #(first %)
          (filter #(= (second %) true)
                  (map vector (map :TYPE nodes) (map :CANSTART nodes))))))
+
+(defn all-type-info-for-type
+  "List the all of the node type info for this node type.
+Output is similar to that obtained from node-type-info, but
+this function uses the local information store rather than
+querying the server."
+  [type]
+  (first (filter #(= (:TYPE %) type) @type-store)))
+
+;; available outputs, e.g. for a type like "text.categorisers.SentimentCategoriser"
+(defn available-outputs-for-type
+  "List the output types that the valid for this node type."
+  [type]
+  (:OUTPUT (first (filter #(= (:TYPE %) type)
+                          @type-store))))
+
+(defn available-inputs-for-type
+  "List the input types that the valid for this node."
+  [type]
+  ;; this restricts to just the basic elements
+  ;; in general, we will want to incorporate a bit more information, e.g. the :ISDATE and :ISNUMERIC fields.
+  ;; ... but at the moment there's more information there than we can really use, e.g.
+  ;;    :DESCRIPTION is pretty useless for a computer, even if it is useful for humans
+  ;; and furthermore
+  ;;    :ALLOWMULTIOPTIONS is a sort of confusing (especially since most of the time it is set to false)
+  (map #(select-keys % [:OPTIONS :TYPE :NAME])
+       (:PARAMETERS (first (filter #(= (:TYPE %) type)
+                                   @type-store)))))
+
+;; Nodes of interest:
+
+;; ConceptNet ConceptNetChainCategoriser ConceptNetChainSorter
+;; ConceptNetChainer Dictionary FootprintMatcher Guardian LineCollator
+;; ListAppender MatchingFootprintCategoriser MetaphorEyes
+;; RegexCategoriser RegexGenerator RegexPhraseExtractor RhymeMatcher
+;; RhymingMatcher SentimentCategoriser SimileRetriever TemplateCombiner
+;; TextOverlapper TextRankKeyphraseExtractor TuplesAppender Twitter
+;; WordListCategoriser WordReplacer WordSenseCategoriser
+
+;;; Further Functionality
 
 (defn delete-server-user-charts 
   "Delete user charts from the server and reset the local store.

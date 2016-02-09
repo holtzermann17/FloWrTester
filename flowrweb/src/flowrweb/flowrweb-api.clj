@@ -45,7 +45,7 @@
                     (fn [k] (keyword (.toUpperCase k))))
       (:body resp))))
 
-;;; Testing code, superseded by `create-api-function' and calls to the same, below.
+;;; Testing code, superseded by `create-api-function' and calls to the same, below.  Check it out!
 
 ;; (defn test-access []
 ;;   (post "test_access" false))
