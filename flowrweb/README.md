@@ -2,6 +2,11 @@
 
 Code for working with the Goldsmiths FloWr (Flowchart Writer) API.
 
+**Outline**
+
+- [Instructions for using the current system](https://github.com/holtzermann17/FloWrTester/tree/master/flowrweb#usage)
+- [Directions for further work](https://github.com/holtzermann17/FloWrTester/tree/master/flowrweb#some-thoughts-on-next-directions)
+
 ## Usage
 
 ### To get started:
