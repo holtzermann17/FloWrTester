@@ -9,6 +9,11 @@ Code for working with the Goldsmiths FloWr (Flowchart Writer) API.
 
 ## Usage
 
+### Summary
+
+- First aim: to provide an interactive programmer's interface that is similar to the interactive GUI available in the FloWr system.  Status: **≈70% complete**
+- Second aim: to actually automatically write programs that achieve some relevant goals. **≈5% complete**
+
 ### To get started:
 
 1. Obtain a current API token from http://ccg.doc.gold.ac.uk/research/flowr/flowrweb/ `->` Admin `->` API.
