@@ -209,6 +209,8 @@ B with matching type."
   (filter #(not-empty (potential-connections % b))
    (map :TYPE @node-store)))
 
+;;; `potential-downstream-fields` and `potential-upstream-fields`
+
 (defn potential-downstream-fields
   "List all of the available downstream fields that a source node of type A could send output to."
   [a]

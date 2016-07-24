@@ -28,10 +28,17 @@ Under the hood: Downloaded information is stored in the variables `node-store`, 
            (potential-connections "text.retrievers.Dictionary" "text.categorisers.WordSenseCategoriser")
   - Show the node types that could be hooked up downstream of a given node type via, e.g.,
 
-           (potential-recipients "text.retrievers.Dictionary")
+           (potential-downstream "text.retrievers.Dictionary")
   - Show the node types that could be hooked up upstream of a given node type via, e.g.,
 
-           (potential-senders "text.retrievers.Dictionary")
+           (potential-upstream "text.retrievers.Dictionary")
+
+  - Show the specific fields that could be hooked up upstream of a given node type via, e.g.,
+
+           (potential-downstream-fields "text.retrievers.Dictionary")
+  - Show the specific fields that could be hooked up upstream of a given node type via, e.g.,
+
+           (potential-upstream-fields "text.retrievers.Dictionary")
 
 
 ## Options
