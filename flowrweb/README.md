@@ -23,9 +23,16 @@ Under the hood: Downloaded information is stored in the variables `node-store`, 
   - List outputs via, e.g., `(available-outputs-for-type "text.retrievers.Dictionary")`
   - List inputs via, e.g., `(available-inputs-for-type "text.retrievers.Dictionary")`
 4. **Note:** The output from Step 3 is not particularly user friendly.   One of these is likely preferable:
-  - Show the specific ways two node types could be connected via, e.g., `(potential-connections "text.retrievers.Dictionary" "text.categorisers.WordSenseCategoriser")`
-  - Show the node types that could be hooked up downstream of a given node type via, e.g., `(potential-recipients "text.retrievers.Dictionary")`
-  - Show the node types that could be hooked up upstream of a given node type via, e.g., `(potential-senders "text.retrievers.Dictionary")`
+  - Show the specific ways two node types could be connected via, e.g.,
+
+           (potential-connections "text.retrievers.Dictionary" "text.categorisers.WordSenseCategoriser")
+  - Show the node types that could be hooked up downstream of a given node type via, e.g.,
+
+           (potential-recipients "text.retrievers.Dictionary")
+  - Show the node types that could be hooked up upstream of a given node type via, e.g.,
+
+           (potential-senders "text.retrievers.Dictionary")
+
 
 ## Options
 
