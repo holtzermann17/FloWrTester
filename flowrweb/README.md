@@ -109,7 +109,7 @@ question or answer?
 results.
 
 > "Where is the closest gas station?"
->> <list of 16 gas stations>
+>> [list of 16 gas stations nearby]
 
 > "Which ones of those are open?"
 >> Would you like me to search the web for 'Which ones of those are open?'?
