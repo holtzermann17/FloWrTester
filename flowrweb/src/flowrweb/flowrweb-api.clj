@@ -1,6 +1,6 @@
 ;;; Commentary:
 
-;; Define Clojure functions that communicate with FloWr over the API.
+;; Defines Clojure functions that communicate with FloWr over the API.
 ;; Relies on global variables defined in core.clj.
 
 ;;; Code:
