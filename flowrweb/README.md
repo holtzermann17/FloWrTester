@@ -15,7 +15,7 @@ Code for working with the Goldsmiths FloWr (Flowchart Writer) API.
 
 Under the hood: Downloaded information is stored in the variables `node-store`, `user-charts`, and `type-store`.
 
-### To do some things with the downloaded information.
+### Do some things with the downloaded information.
 
 1. For interactive use you may want to readjust `*print-length*` via `(set! *print-length* nil)`.
 2. List available nodes with `(all-node-names)` or `(chart-starting-nodes)`
