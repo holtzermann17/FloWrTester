@@ -21,6 +21,8 @@
 ;; one test to rule them all...
 (defn boolean? [x]
   (or (true? x) (false? x)))
+;; [OR ALTERNATIVELY, USE A LATTICE HERE,
+;;  ... if we want different degrees of satisfaction of tests.]
 
 ;; IsRegex.java
 
@@ -149,12 +151,32 @@
 ;; e.g. whether the word is in wordnet.  (Note that Wordnet does
 ;; not contain all words, e.g. it doesn't contain pronouns.)
 
-(defn test-string-is-word
-  "Allow a string that represents an word, defined by not containing spaces."
+(defn word?
+  "Allow a string that represents a word, defined by not containing spaces."
   [x]
   {:pre [(string? x)]
    :post [(boolean? %)]}
   (if (some #(= \space %) (seq x))
+    false
+    true))
+
+;; This is an example of a test whose precondition is defined in terms of
+;; another test - this shows that we're effectively doing a kind of subtyping.
+(defn noun?
+  "Allow a word that has a noun sense."
+  [x]
+  {:pre [(word? x)]
+   :post [(boolean? %)]}
+  (if (empty? (flowrweb.core/wordnet x :noun))
+    false
+    true))
+
+(defn verb?
+  "Allow a word that has a verb sense."
+  [x]
+  {:pre [(word? x)]
+   :post [(boolean? %)]}
+  (if (empty? (flowrweb.core/wordnet x :verb))
     false
     true))
 
@@ -170,7 +192,7 @@
     (if (empty? items)
       true
       ;; otherwise, test the next item and proceed accordingly
-      (if (test-string-is-word (first items))
+      (if (word? (first items))
         (recur (rest items))
         false))))
 
@@ -214,7 +236,33 @@
   (loop [items (str/split x #";")]
     (if (empty? items)
       true
-      (if (test-string-is-word (first items))
+      (if (word? (first items))
+        (recur (rest items))
+        false))))
+
+;; A space-separated list of words is a phrase.
+;; (Will this ever fail?)
+(defn test-string-is-phrase
+  "."
+  [x]
+  {:pre [(string? x)]
+   :post [(boolean? %)]}
+  (loop [items (str/split x #" ")]
+    (if (empty? items)
+      true
+      (if (word? (first items))
+        (recur (rest items))
+        false))))
+
+(defn test-string-semicolon-separated-phrases
+  "."
+  [x]
+  {:pre [(string? x)]
+   :post [(boolean? %)]}
+  (loop [items (str/split x #";")]
+    (if (empty? items)
+      true
+      (if (test-string-is-phrase (first items))
         (recur (rest items))
         false))))
 
@@ -257,7 +305,7 @@
   (loop [items (str/split x #"_")]
     (if (empty? items)
       true
-      (if (test-string-is-word (first items))
+      (if (word? (first items))
         (recur (rest items))
         false))))
 
@@ -302,6 +350,7 @@
 
 ;; SelectionFrom.java
 
+;; e.g. could use a value like percentage of overlap here
 (defn test-selection-from
   "x is a vector, y is a vector that should be entirely comprised of elements selected from x."
   [x y]

@@ -14,6 +14,9 @@ first item in each coll, then the second etc.  Returns nil."
   [coll target]
   (some #(= target %) coll))
 
+(defn which [pred coll]
+  (first (filter pred coll)))
+
 ;;; Some experiments with macros
 
 ;; Clojure doesn't permit you to `apply' a macro so here's a quick work around.
@@ -45,3 +48,13 @@ first item in each coll, then the second etc.  Returns nil."
   ;; Expands to:  (and true true false)"
   [macro & args]
   (cons macro (spread (map eval args)))) 
+
+;; For the following,
+;; look in /home/joe/FloWrTester/flowrweb/src/incanter/modules/incanter-core/src/incanter for the source files
+;; Cf. http://repo.incanter.org/
+;;
+(defn cosine-sim
+  [model word1 word2]
+  (let [rawvecfn  #(.getRawVector (.forSearch model) %)
+        [a1 a2] (map rawvecfn [word1 word2])]
+    (stats/cosine-similarity a1 a2)))

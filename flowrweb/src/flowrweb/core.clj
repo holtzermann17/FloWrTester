@@ -6,7 +6,11 @@
             [clojure.zip :as z]
             [clj-wordnet.core :refer :all]
             [clojure.core.async :refer [chan close! go >! <!!]]
-            [clojure.edn :as edn])
+            [clojure.edn :as edn]
+            [clojure-word2vec.core :refer :all]
+            [clojure.java.io :as io]
+            [incanter.core :as incanter]
+            [incanter.stats :as stats])
   (:gen-class))
 
 ;; Make some convenient tools for printing available.
@@ -16,14 +20,17 @@
 (require '[clojure.string :as str])
 
 ;; preserve sanity in case of large printouts
+;; ... what's the corresponding variable for depth?
 (set! *print-length* 10) 
+(set! *print-level* 10)
 
 ;; ... and this gives a work-around in case one needs to inspect the entire result
 (defn print-all
   "Run BODY and then print the entire result."
   [body]
   (let [result (do body)]
-    (binding [*print-length* nil]
+    (binding [*print-length* nil
+              *print-level* nil]
       (prn result))))
 
 ;;; Basic global variables (see flowrweb-client.clj for more interesting data structures)
@@ -40,24 +47,31 @@
 
 (def timestamp-formatter (tf/formatter "yyyy-MM-dd hh:mm:ss"))
 
-;; Setting up this parsing stuff takes a few seconds, and I'm not using it
-;; at the moment -- maybe I'll revive it later.
-; (load "nlp-tools")
+;; Setting up this parsing stuff takes a few seconds
+(load "nlp-tools")
 ;; Functions for extracting triples from text
-; (load "extractor")
+(load "extractor")
+
+;; Incorporating some code from https://github.com/Bridgei2i/clojure-word2vec
+;; Building word2vec models
+;
+; (def ulysses-data (create-input-format "/home/joe/FloWrTester/flowrweb/src/clojure-word2vec/resources/ulysses.txt"))
+; (def ulysses-model (word2vec ulysses-data))
+;
+;; Hm... Here are some pre-trained ones: https://github.com/3Top/word2vec-api#where-to-get-a-pretrained-models
 
 ;;; Utility functions
 (load "utility")
 
 ;;; Load additional files containing relevant functionality:
 
-;; Hook into the API:
+;; Hook into the FloWr API:
 (load "flowrweb-api")
 
-;; Functions for making use of the information in the API
+;; Functions for making use of the information in the FloWr API
 (load "flowrweb-client")
 
-;; Load some functions for working with a local mock-up of FloWr using Clojure functions
+;; Load some functions for working with a local mock-up of automatic programming in FloWr using Clojure functions
 (load "fake-flowrs-tests")
 (load "fake-flowrs-meta")
 (load "fake-flowrs")
@@ -70,11 +84,14 @@
   (println (generate-string {:foo "It costs £100"} {:escape-non-ascii false}))
   (println "The time is now:" (tf/unparse timestamp-formatter (t/now)))
   ;; NLP stuff
-;  (println (:gloss (first (wordnet "teapot" :noun))))
-;  (println (first (treebank-parser ["I'm a little teapot !"])))
-;  (pprint (triplet-extraction
-;           (first (treebank-parser
-;                   ["A rare black squirrel has become a regular visitor to a suburban garden ."]))))
+  (println (:gloss (first (wordnet "teapot" :noun))))
+  (println (first (treebank-parser ["I'm a little teapot !"])))
+  (pprint (triplet-extraction
+           (first (treebank-parser
+                   ["A rare black squirrel has become a regular visitor to a suburban garden ."]))))
+  ;; remove this for now
+  ;;
+  ;; (println (get-matches ulysses-model "woman"))
   ;; Generic testing
 ;  (println (test-access))
 ;  (println (list-all-nodes))
