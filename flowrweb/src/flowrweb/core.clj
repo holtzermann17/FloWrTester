@@ -33,6 +33,14 @@
               *print-level* nil]
       (prn result))))
 
+(defn pprint-all
+  "Run BODY and then print the entire result."
+  [body]
+  (let [result (do body)]
+    (binding [*print-length* nil
+              *print-level* nil]
+      (pprint result))))
+
 ;;; Basic global variables (see flowrweb-client.clj for more interesting data structures)
 
 ;; I'm putting these here because the token is likely to change

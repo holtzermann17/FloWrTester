@@ -36,52 +36,133 @@ E.g. the fully qualified var that holds *this* function is #'fake.flowrs-meta/qu
 ;;
 ;; (Notice that there seems to be some theoretical structure here, regarding the creation of a new grammar.)
 
-(def basic-tests
+(def basic-types
   "Define the basic types that all of the tests will ultimately be derived from."
   '[vector? integer? string? test/function? float?])
 
+;;; Editorial: With clojure I have the feeling that a massive and rather horrible function like this
+;;; could be "reduced" to some super-succinct `reduce` call by someone who knows the ins and outs of the language.
+;;
+;; Another worry: Since we're sorting through the list, does it somehow matter what order
+;; we go in?  Supposing test a? is defined in terms of test b?, but we encounter b? first.  I think
+;; that's not a problem b/c we start with a definitive global structure and refer to that while
+;; we put things in order.
 (defn heredity-of-signatures
   "Compute the derived type of each test."
   []
-  (let [metadata-collection (all-prepost-tests)]
+  ;; gather the metadata collection, and to start with, a map of types (at this point, they have no associated tests)
+  (let [metadata-collection (all-prepost-tests)
+        type-map (atom (reduce (fn [new-map key] (assoc new-map [(symbol (str/upper-case (name key)))] []))
+                               {} basic-types))]
     (doseq [test metadata-collection]
       ;; for each individual test...
       (let [{pre :pre, node :node} test]
-        (println node)
         ;; look at what defines its several preconditions...
-        ;; and for each defining element, see if that is a "basic test"
-        (let [match-results 
-              (map #(let [yes 
-                          ;; <idiom: like `some` but return the matching item
-                          (first (filter (fn [basic-item] 
-                                           (= basic-item (first %)))
-                                         fake.flowrs-meta/basic-tests))]
-                      ;; if we get a positive result, then this is very easy
-                      (if yes
-                        (str/upper-case (name yes))
-                        ;; ... but if not, then we've found a derived test, and
-                        ;; we need to trace its heredity
-                        (cond
-                          ;; CASE 1: `every?` will make us interested in the *second* place.
-                          ;; ... but that's not quite enough, because we need to figure out which
-                          ;; vector the `every?` command is associated with
-                          (= (first %) 'every?) (str "every!->" (second %))
-                          ;; CASE 2: otherwise the test should presumably be one of the defined (non-basic) tests
-                          ;; ... but that one also may be defined in terms of another test, and so on...
-                          ;; something to solve here! TODO
-                          (some (fn [record] (= (first %)
-                                                (:node record)))
-                                metadata-collection) (str "test!->" (first %))
-                          :else (first %))))
-                                 pre)]
-          (println " " match-results))))))
-
+        ;; and for each "requirement" that forms part of the test, see if it is a "basic type" (as defined above)
+        ;(println node)
+        ;; Here we also set up a variable to collect required rewrites
+        (let [every-rewrites (atom [])
+              match-results
+              (map (fn [requirement]
+                     (let [requirement-is-basic
+                           ;; <idiom: like `some` but return the matching item
+                           (first (filter (fn [basic-item]
+                                            (= basic-item (first requirement)))
+                                          fake.flowrs-meta/basic-types))]
+                       ;; if we get a positive result, then this is very easy
+                       (if requirement-is-basic
+                         (symbol (str/upper-case (name requirement-is-basic)))
+                         ;; ... but if not, then we've found a derived test, and
+                         ;; we need to trace its heredity
+                         (cond
+                           ;; EXCEPTIONAL CASE 1: `every?` will make us interested in the *second* position.
+                           ;; ... but that's not quite enough, because we need to figure out *which*
+                           ;; vector the `every?` command is associated with, and that depends on
+                           ;; the *third* position -- (nth ... 2) -- followed by matching into the
+                           ;; `test` variable that we haven't used much so far.  But we get to that step
+                           ;; below.
+                           (= (first requirement) 'every?)
+                           (do (swap! every-rewrites conj [(nth requirement 2) (nth requirement 1)])
+                               nil)
+                           ;; ... and just add `nil` to the list
+                           ;;
+                           ;; EXCEPTIONAL CASE 2: otherwise the test should presumably be one of the defined
+                           ;; (i.e., non-basic) tests
+                           ;; ... however that test may *also* be defined in terms of another test, and so on...
+                           ;; something to solve here!
+                           ;;
+                           ;; Thing are somewhat simpler if we assume that these tests are *only* subtyping
+                           ;; i.e. that we don't see requirements like `(test-xy x y)` -- though to be honest
+                           ;; there's no real reason why we shouldn't include that sort of test.
+                           ;; But at least for now, they aren't used so let's temporarily
+                           ;; assume that we can do without them.  I think this may be a good use case for
+                           ;; clojure.spec, but I'll have to investigate that later.
+                           (some (fn [record] (= (first requirement)
+                                                 (:node record)))
+                                 metadata-collection)
+                           (do
+                             ;; grab the matching test in the `metadata-collection` (we now know it exists)
+                             (loop [relevant-test (first (filter (fn [record] (= (first requirement)
+                                                                                 (:node record)))
+                                                                 metadata-collection))
+                                        ;chain (str "test![" (first requirement) "]")
+                                    chain [(first requirement)]]
+                               ;; check to see if this test is basic
+                               (let [prev-is-basic (first (filter (fn [basic-item]
+                                                                    (= basic-item
+                                                                       ;; here we make use of the "only subtyping"
+                                                                       ;; assumption
+                                                                       (first (first (:pre relevant-test)))))
+                                                                  fake.flowrs-meta/basic-types))]
+                                 (if prev-is-basic
+                                   ;; if so, we're done, just flesh out the chain with the last link, and return
+                                   (vec (reverse (conj chain (symbol (str/upper-case (name prev-is-basic))))))
+                                   ;; but if not, loop through, continuing the chain
+                                   (recur (first (first (:pre relevant-test)))
+                                        ;(str chain "->test![" (first (first (:pre relevant-test))) "]")
+                                          (conj chain (first (first (:pre relevant-test))))
+                                          )))))
+                           :else (first requirement)))))
+                   pre)
+              ;; adjust the match-results that have as associated "every" property, following a pattern like this:
+              ;; (note that the order isn't guaranteed to be "sensible" for `pre`...)
+              ;;
+              ;; `every-rewrites`:  [            [z string?]                    [y integer?]]
+              ;; `pre`:            [(vector? y) (every? string? z) (vector? z) (every? integer? y)]
+              ;; `match-result`     [VECTOR?     nil                VECTOR?     nil]
+              ;;
+              ;; `adjusted-result`: [{VECTOR? STRING?}              {VECTOR? INTEGER?}]
+              adjusted-result (filter #(not (nil? %))
+                                      ;; loop over `match-results` and `pre` together
+                                      (map (fn [match-component pre-component]
+                                             ;; let's see if the `pre-component` matches some rewrite rule
+                                             ;; Note, we only care about rewriting vector elements.
+                                             ;; look for a match:
+                                             (if (= 'vector? (first pre-component))
+                                               (let [matching-rewrite (first (filter
+                                                                  (fn [possible-rewrite] 
+                                                                    (= (nth possible-rewrite 0)
+                                                                       (nth pre-component 1)))
+                                                                  @every-rewrites))]
+                                                 ;; if we find one, convert the match component into a map
+                                                 (if matching-rewrite 
+                                                   {match-component  (second matching-rewrite)}
+                                                   match-component))
+                                               match-component))
+                                           match-results
+                                           pre))]
+          ;(println "   " adjusted-result)
+          (swap! type-map #(assoc-in % [(vec adjusted-result)]
+                                     ((fnil conj [])
+                                      (get % (vec adjusted-result))
+                                      node))))))
+    @type-map))
 
 (defn dataset-profile
   "Code the data according to its type signature."
   [data]
   (into '[]
-        (map (fn [x] (cond 
+        (map (fn [x] (cond
                        (integer? x) 'integer?
                        (vector? x)  'vector?
                        (symbol? x)  'symbol?
@@ -166,4 +247,3 @@ E.g. the fully qualified var that holds *this* function is #'fake.flowrs-meta/qu
 
 ; So, where does the automatic program generation stuff come into play
 ; in these various examples?
-
