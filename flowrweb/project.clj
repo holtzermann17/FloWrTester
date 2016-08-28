@@ -6,6 +6,8 @@
                  [cheshire "5.5.0"]
                  [clj-http "2.0.0"]
                  [instaparse "1.4.1"]
+                 [me.raynes/conch "0.8.0"]
+                 ;[bilus/pipes "0.1.2"]
                  [clojure-opennlp "0.3.3"]
                  [clj-wordnet "0.1.0"]
                  [org.bridgei2i/word2vec "0.2.1"]

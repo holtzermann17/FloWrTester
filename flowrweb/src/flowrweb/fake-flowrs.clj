@@ -1,5 +1,6 @@
 (ns fake.flowrs
-  (:require [clojure.string :as str]))
+  (:require [clojure.string :as str]
+            [me.raynes.conch.low-level :as sh]))
 
 ;; This function illustrates that there's a lot of things that
 ;; can be asserted even about a simple function.  Do we need
@@ -83,3 +84,8 @@
   ;; chosen correctly, so we can convert to 
   (map (fn [word] )
        (str/split x #" ")))
+
+;;; More stuff
+
+;; Here it makes sense to write some functions for interacting with Stephen's model, using the
+;; `gljcon` function from utility.clj

@@ -66,6 +66,8 @@ E.g. the fully qualified var that holds *this* function is #'fake.flowrs-meta/qu
               (map (fn [requirement]
                      (let [requirement-is-basic
                            ;; <idiom: like `some` but return the matching item
+                           ;; ... although `some` can also do this, e.g. (some #(if (> % 3) %) [1 2 3 4 5])
+                           ;; ... so maybe I should use that instead
                            (first (filter (fn [basic-item]
                                             (= basic-item (first requirement)))
                                           fake.flowrs-meta/basic-types))]
@@ -151,7 +153,6 @@ E.g. the fully qualified var that holds *this* function is #'fake.flowrs-meta/qu
                                                match-component))
                                            match-results
                                            pre))]
-          ;(println "   " adjusted-result)
           (swap! type-map #(assoc-in % [(vec adjusted-result)]
                                      ((fnil conj [])
                                       (get % (vec adjusted-result))
@@ -159,7 +160,8 @@ E.g. the fully qualified var that holds *this* function is #'fake.flowrs-meta/qu
     @type-map))
 
 (defn dataset-profile
-  "Code the data according to its type signature."
+  "Code the data according to its type signature.
+More specific codings are preferred over less specific."
   [data]
   (into '[]
         (map (fn [x] (cond
@@ -247,3 +249,4 @@ E.g. the fully qualified var that holds *this* function is #'fake.flowrs-meta/qu
 
 ; So, where does the automatic program generation stuff come into play
 ; in these various examples?
+

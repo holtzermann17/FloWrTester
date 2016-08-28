@@ -4,6 +4,9 @@
             [clj-time.core :as t]
             [clj-time.format :as tf]
             [clojure.zip :as z]
+            [me.raynes.conch.low-level :as sh]
+            ;[pipes.core :refer [->pipe pipe-> ->pipe-> ->job->]]
+            ;[pipes.shell :refer [exec]]
             [clj-wordnet.core :refer :all]
             [clojure.core.async :refer [chan close! go >! <!!]]
             [clojure.edn :as edn]
@@ -40,6 +43,14 @@
     (binding [*print-length* nil
               *print-level* nil]
       (pprint result))))
+
+(defn return-all
+  "Run BODY and then print the entire result."
+  [body]
+  (let [result (do body)]
+    (binding [*print-length* nil
+              *print-level* nil]
+      result)))
 
 ;;; Basic global variables (see flowrweb-client.clj for more interesting data structures)
 

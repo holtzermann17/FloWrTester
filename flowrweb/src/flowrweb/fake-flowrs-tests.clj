@@ -182,7 +182,7 @@
 
 ;; ExclamSeparatedWords.java
 
-(defn test-string-exclam-separated-words
+(defn test-string-!-separated-words
   "."
   [x]
   {:pre [(string? x)]
@@ -198,7 +198,7 @@
 
 ;; ExclamSeparatedInts.java
 
-(defn test-string-exclam-separated-ints
+(defn test-string-!-separated-ints
   "."
   [x]
   {:pre [(string? x)]
@@ -212,7 +212,7 @@
 
 ;; ExclamSeparatedIntsOrAll.java
 
-(defn test-string-exclam-separated-ints-or-all
+(defn test-string-!-separated-ints-or-all
   "x is a string that is either a !! list of integers or the singular symbol \"all\"."
   [x]
   {:pre [(string? x)]
@@ -269,7 +269,7 @@
 ;; ExclamSeparatedItemsFromList.java
 ;; here we might further want to guarantee that y is a list of strings...
 
-(defn test-string-exclam-separated-items-from-list
+(defn test-string-!-separated-items-from-list
   "."
   [x y]
   {:pre [(string? x)
@@ -337,7 +337,7 @@
   [x y z]
   {:pre [(test/function? x)
          (vector? y)
-         (test-string-exclam-separated-ints-or-all z)]
+         (test-string-!-separated-ints-or-all z)]
    :post [(boolean? %)]}
   (if (= z "all")
     (test-each-one x y)
