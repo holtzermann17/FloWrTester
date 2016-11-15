@@ -1,44 +1,70 @@
 ;;; A namespace for functions that interact with our database of "nodes"
 
 (ns fake.flowrs-meta
-  (:require [clojure.test :as test]
+  (:require [clojure.spec :as s]
+            [clojure.test :as test]
             [clojure.string :as str]))
 
 ;; Relevant theory -- program expressions in
 ;; Ionut Tutu & Fiadeiro, "Service Oriented Logic Programming"
 
-;; First task: can we then search the defined functions for a given
-;; property?
+;; First task:
+;; Can we then search the defined functions for a given property?
 
-(defn queryfnx
-  "Get the pre and post conditions for a given function.
+(defn spec-info
+ [spec]
+  (apply hash-map (rest (s/describe spec))))
+
+(defn queryfnx-spec
+  "Get the spec for a given function, if it exists.
 The input should expressed in the form of a fully qualified var.
-E.g. the fully qualified var that holds *this* function is #'fake.flowrs-meta/queryfnx."
+E.g. the fully qualified var that holds *this* function is
+#'fake.flowrs-meta/queryfnx."
   [var]
-  (-> var meta :arglists first meta))
+  (spec-info (s/get-spec var)))
 
-(defn all-prepost
-  "Maps describing the functions in fake.flowrs with their :pre and :post conditions and :node name."
+(defn all-specs
+  "Lazy sequence of maps describing the spec'd functions in fake.flowrs.
+  Functions are described in terms of their :pre and :post
+  conditions and :node name."
   []
-  (map #(assoc (queryfnx (val %)) :node (key %))
-       (ns-publics 'fake.flowrs)))
+  ;; build up the data structure we need
+  (map #(assoc (spec-info (get (s/registry) %))
+               :node (symbol (name %)))
+       ;; after identifying the functions of interest
+       ;; (let's assume that only *functions* are defined in this
+       ;; namespace)
+       (filter #(= (namespace %) "fake.flowrs")
+               (keys (s/registry)))))
 
-(defn all-prepost-tests
-  "Return a lazy sequence of maps describing the functions in fake.flowrs-tests with all of their pre and post conditions."
-  []
-  (map #(assoc (queryfnx (val %)) :node (key %))
-       (ns-publics 'fake.flowrs-tests)))
+;;; Is this thing needed anymore?  It seems to be contained in the above.
+;; (defn all-prepost-tests
+;;   "A lazy sequence of maps describing functions in fake.flowrs-tests.
+;; The maps include all of the function's pre and post conditions."
+;;   []
+;;   (map #(assoc (queryfnx (val %)) :node (key %))
+;;        (ns-publics 'fake.flowrs-tests)))
 
-;; This should take into account the various available types/tests and subtypes
-;; in order to make the most precise description of the input available.
+;; This should take into account the various available types/tests and
+;; subtypes in order to make the most precise description of the input
+;; available.
+
 ;; So, for example, ["backpack"] specialises as "string->word->noun, verb"
 ;;         whereas  ["rucksack"] specialises as "string->word->noun"
-;;
-;; (Notice that there seems to be some theoretical structure here, regarding the creation of a new grammar.)
+
+;; [1, "tree", ["abc" "def]]
+
+;; (Notice that there seems to be some theoretical structure here,
+;; regarding the creation of a new grammar.)
 
 (def basic-types
-  "Define the basic types that all of the tests will ultimately be derived from."
+  "Define the basic types that all of the tests will be derived from."
   '[vector? integer? string? test/function? float?])
+
+;; JC: Sat Nov 5, the following needs to be ported to match the setup
+;; defined above.  That probably won't be so hard b/c the new setup
+;; is pretty similar to the old one.
+(comment
 
 ;;; Editorial: With clojure I have the feeling that a massive and rather horrible function like this
 ;;; could be "reduced" to some super-succinct `reduce` call by someone who knows the ins and outs of the language.
@@ -48,25 +74,37 @@ E.g. the fully qualified var that holds *this* function is #'fake.flowrs-meta/qu
 ;; that's not a problem b/c we start with a definitive global structure and refer to that while
 ;; we put things in order.
 (defn heredity-of-signatures
-  "Compute the derived type of each test."
+  "Compute the derived type signature of each available node."
   []
-  ;; gather the metadata collection, and to start with, a map of types (at this point, they have no associated tests)
-  (let [metadata-collection (all-prepost-tests)
-        type-map (atom (reduce (fn [new-map key] (assoc new-map [(symbol (str/upper-case (name key)))] []))
+  ;; gather the metadata collection that is distributed across nodes
+  (let [metadata-collection (all-specs)
+        ;; and build a map of basic types, which we will populate
+        ;; with their derived types
+        type-map (atom (reduce (fn [new-map key]
+                                 (assoc new-map
+                                        [(symbol (str/upper-case
+                                                  (name key)))] []))
                                {} basic-types))]
     (doseq [test metadata-collection]
       ;; for each individual test...
-      (let [{pre :pre, node :node} test]
-        ;; look at what defines its several preconditions...
-        ;; and for each "requirement" that forms part of the test, see if it is a "basic type" (as defined above)
-        ;(println node)
+      ;; we need to disassemble the :args component
+      ;; in order to determine what the preconditions are.
+      ;;
+      ;; Presumably clojure.spec has some way to do this, let's see...
+      ;; it'd be convenient to re-use that code.  Note the "regexp ops"
+      ;; are:           cat, alt, *, +, ?,
+      (let [{args :args, node :node} test]
+        ;; look at what defines its one or several preconditions...
+        ;; and for each "requirement" that forms part of the test
+        ;; see if it is a "basic type" (as defined above)
+        ; (println node)
         ;; Here we also set up a variable to collect required rewrites
         (let [every-rewrites (atom [])
               match-results
               (map (fn [requirement]
                      (let [requirement-is-basic
                            ;; <idiom: like `some` but return the matching item
-                           ;; ... although `some` can also do this, e.g. (some #(if (> % 3) %) [1 2 3 4 5])
+                           ;; ... although `some` can also do this:    (some #(if (> % 3) %) [1 2 3 4 5])
                            ;; ... so maybe I should use that instead
                            (first (filter (fn [basic-item]
                                             (= basic-item (first requirement)))
@@ -250,3 +288,4 @@ More specific codings are preferred over less specific."
 ; So, where does the automatic program generation stuff come into play
 ; in these various examples?
 
+)

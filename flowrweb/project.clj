@@ -2,7 +2,7 @@
   :description "Clojure wrapper for FloWrWeb"
   :url "http://metameso.org/~joe"
   :jvm-opts ["-Xmx3g"]
-  :dependencies [[org.clojure/clojure "1.8.0"] ;; note: to play with the latest clojure.spec stuff, bump this up...
+  :dependencies [[org.clojure/clojure "1.9.0-alpha13"] ;; "1.8.0" note: to play with the latest clojure.spec, need
                  [cheshire "5.5.0"]
                  [clj-http "2.0.0"]
                  [instaparse "1.4.1"]
@@ -15,7 +15,8 @@
                  [org.clojure/core.async "0.2.374"]]
   :main ^:skip-aot flowrweb.core
   :target-path "target/%s"
-  :profiles {:uberjar {:aot :all}})
+  :profiles {:uberjar {:aot :all}
+             :dev {:dependencies [[org.clojure/test.check "0.9.0"]]}})
 
 ;;; Requirements are:
 

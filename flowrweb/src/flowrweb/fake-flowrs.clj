@@ -1,91 +1,119 @@
 (ns fake.flowrs
-  (:require [clojure.string :as str]
-            [me.raynes.conch.low-level :as sh]))
+  (:require [clojure.spec :as s]
+            [clojure.spec.gen :as gen]
+            [clojure.spec.test :as stest]
+            [clojure.string :as str]))
+
+;;; Simple example
 
 ;; This function illustrates that there's a lot of things that
 ;; can be asserted even about a simple function.  Do we need
-;; to assert all of this?  It's only relevant as long as it's 
-;; interpretable.
+;; to assert all of this?  It's only relevant as long as it's
+;; interpretable.  I guess it is, if we write it in the spec
+;; way.  And when we do it like this, we can generate arbitrary
+;; input, see below.
 
-(defn pair-builder 
-  "Given two integers, return them formatted as a vector pair."
-  [x y] 
-  {:pre [(integer? x)
-         (integer? y)]
-   :post [(vector? %)
-          (= x (nth % 0))
-          (= y (nth % 1))
-          (= (count %) 2)]
-   }
-  (let [y (+ 1 x)]
-    [x y]))
+(s/fdef pair-builder
+        :args (s/cat :left integer? :right integer?)
+        :ret vector?
+        :fn (fn [{{left :left right :right} :args ret :ret}]
+              (= left (first ret))
+              (= right (second ret))))
 
-;; The following function is more like a FloWr node, insofar as it returns
-;; a map, and the elements of the map can be thought of as "fields".
+(defn pair-builder [x y]
+  (vector x y))
 
-(defn mapper [x y] 
-  {:pre [(integer? x)
-         (integer? y)]
-   :post [(fake.flowrs-tests/test-each-one integer? (:tacos %))
-          (fake.flowrs-tests/test-each-one integer? (:burritos %))]
-   }
+;; Exercise with: (s/exercise-fn 'fake.flowrs/pair-builder)
+;; Check with: (stest/check 'fake.flowrs/pair-builder)
+
+;;; Another example
+
+;; The following function is more like a FloWr node, insofar as
+;; it returns a map, and the elements of the map could be thought of
+;; as "fields".
+
+;; Hm, I wonder if the function could actually be generated directly
+;; from the spec?
+
+;; I've asked a question about this function here:
+;; https://groups.google.com/forum/#!topic/clojure/7qQJD3805I8
+
+;; http://blog.cognitect.com/blog/2016/10/5/interactive-development-with-clojurespec
+;; begins to address the issues there
+
+;; I created an issue in the FloWrTester repo to keep track of
+;; further discussion about this matter: in short, even though
+;; we have a logical specification of the function behavior in
+;; this case, generating the code from the spec would take some
+;; more work.  It's interesting to wonder whether we could do
+;; that with the generators in clojure.spec itself!
+
+(s/fdef mapper
+        :args (s/cat :t :fake.flowrs-tests/positive-integer?
+                     :b :fake.flowrs-tests/positive-integer?)
+        :ret map?
+        :fn (fn [{args :args ret :ret}]
+              (= (:tacos ret)
+                 (vec (range (:t args))))
+              (= (:burritos ret)
+                 (vec (range (:b args))))))
+
+;; Here's the desired definition:
+(defn mapper [x y]
   {:tacos (vec (range x))
-   :burritos (vec (range y))})
+   :burritos (vec (range  y))})
 
-;; What to do next?
+;; This alternative definition kicks an error for `stest/check`:
+;; (defn mapper [x y]
+;;   {:tacos (vec (range x))
+;;    :burritos (vec (range (+ 1  y)))})
 
-;; [DONE] Maybe what's really needed here is a collection of predicates
-;; similar to the ones that I wrote out for existing FloWr nodes,
-;; so that instead of writing `vector?` here, one would write
-;; `vector-of-integers?` for example. 
-;; [SEE fake-flowrs-tests, AND NOTICE THE IMPLEMENTATION OF `mapper`
-;;  USES THE NEW FUNCTIONS.]
-;;
-;; With this way of thinking, what is interesting is *defining*
-;; and *reasoning about* all of the different predicates that can describe
-;; emitted or accepted variables, since these are also delimit the ways in
-;; which functions can be hooked together.
-;;
-;; (But it is also worth thinking some more functions that are worth
-;; defining!)
+;;; Some Wordnet-based examples
 
-;; - Maybe some functions to use wordnet, e.g. `hyponym` and `hypernym`?
-;; - Maybe get word2vec or GloVe running here and use that?
-;;   cf. https://github.com/Bridgei2i/clojure-word2vec
-;; - Maybe look through the Corneli & Corneli paper for ideas on
-;;   "the composition problem"?
-;; - There are some similar ideas in Chiriță and Fiadeiro -- 
-;;   the models in this paper are a little bit like "templates" in the
-;;   poetry paper
+;; This is less developed, but in the other file I specified the *types*
+;; Here I am specifying some functions that have those types for inputs
+;; and outputs. -- E.g. this takes a "noun" as input and produces
+;; "semicolon-separated-phrases" as output
+(s/fdef gloss-noun
+        :args :fake.flowrs-tests/noun?
+        :ret :fake.flowrs-tests/semicolon-separated-phrases?)
 
-;; Here, notice that the tests describe the "shape" of the returned data,
-;; so that subsequent clients can know how to disassemble them
-;;
 (defn gloss-noun [x]
-  {:pre [(fake.flowrs-tests/noun? x)]
-   :post [(fake.flowrs-tests/test-string-semicolon-separated-phrases  %)]}
-   (:gloss (first (flowrweb.core/wordnet x :noun))))
+  (:gloss (first (flowrweb.core/wordnet x :noun))))
+
+(s/fdef gloss-verb
+        :args :fake.flowrs-tests/verb?
+        :ret :fake.flowrs-tests/semicolon-separated-phrases?)
 
 (defn gloss-verb [x]
-  {:pre [(fake.flowrs-tests/verb? x)]
-   :post [(fake.flowrs-tests/test-string-semicolon-separated-phrases  %)]}
-   (:gloss (first (flowrweb.core/wordnet x :verb))))
+  (:gloss (first (flowrweb.core/wordnet x :verb))))
 
-(defn semicolon-separated-phrases-to-vector [x] 
-  {:pre [(fake.flowrs-tests/test-string-semicolon-separated-phrases x)]
-   :post [(vector? %)]}
-  ;; should clean up on either side of the split
-  (str/split x #";"))
+(s/fdef semicolon-separated-phrases-to-vector
+        :args :fake.flowrs-tests/semicolon-separated-phrases?
+        :ret vector?)
 
-(defn phrase-to-glosses [x] 
-  {:pre [(fake.flowrs-tests/test-string-is-phrase x)]
-   :post [(vector? %)]}
-  ;; here it would make sense to parse in order to get the word senses
-  ;; chosen correctly, so we can convert to 
-  (map (fn [word] )
-       (str/split x #" ")))
+(defn semicolon-separated-phrases-to-vector [x]
+  ;; clean up on either side of the split
+  (map str/trim (str/split x #";")))
+
+;;; This part specifies the "spec" -- ...
+(s/fdef phrase-to-glosses
+        :args :fake.flowrs-tests/phrase?
+        :ret vector?)
+
+;; Tokenize to get the word senses, then look up glosses
+(defn phrase-to-glosses [x]
+  (into []
+        (remove nil?
+                (map
+                 (fn [[word sense]]
+                   (cond
+                     (str/starts-with? sense "N") (gloss-noun word)
+                     (str/starts-with? sense "V") (gloss-verb word)))
+                 (flowrweb.core/pos-tag
+                  (flowrweb.core/tokenize x))))))
 
 ;;; More stuff
 
-;; Here it makes sense to write some functions for interacting with Stephen's model, using the
-;; `gljcon` function from utility.clj
+;; Here it may make sense to write some functions for interacting with
+;; Stephen's model, e.g. using the `gljcon` function from utility.clj

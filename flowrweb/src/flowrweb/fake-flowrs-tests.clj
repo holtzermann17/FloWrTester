@@ -14,348 +14,240 @@
 ;; This initial set of tests can be extended easily enough with more.
 
 (ns fake.flowrs-tests
-  (:require [clojure.string :as str]
+  (:require [clojure.spec :as s]
+            [clojure.spec.gen :as gen]
+            [clojure.string :as str]
             [clojure.test :as test]
             [clojure.set :as set]))
 
 ;; one test to rule them all...
-(defn boolean? [x]
-  (or (true? x) (false? x)))
+(s/def ::boolean?
+  (s/or :true true? :false false?))
+
 ;; [OR ALTERNATIVELY, USE A LATTICE HERE,
 ;;  ... if we want different degrees of satisfaction of tests.]
 
+;;  Similar to FloWr, we have inputs and outputs of different (sub)types.
+
 ;; IsRegex.java
 
-(defn test-string-is-regex 
-  "Examples: \"abc\" is a regex, \"[^abc\" is not."
-  [x]
-  {:pre [(string? x)]
-   :post [(boolean? %)]}
-  (try (do (java.util.regex.Pattern/compile x)
-           true)
-       (catch java.util.regex.PatternSyntaxException e false)))
-  
+;;  Examples: \"abc\" is a regex, \"[^abc\" is not.
+;; e.g. a regular expression...
+(s/def ::regex?
+  (s/and string?
+         #(try (do (java.util.regex.Pattern/compile %)
+                   true)
+               (catch java.util.regex.PatternSyntaxException
+                   e false))))
+
 ;; StringInList.java
 ;; The requirement to be boolean means being a bit
 ;; pedantic about true and false (as opposed to "nil", which is "falsey").
 
-(defn test-string-in-list
-  "."
-  [x y]
-  {:pre [(string? x)
-         (vector? y)]
-   :post [(boolean? %)]}
-  (if (some #(= x %) y)
-    true
-    false))
+;; Examples:
+;; (s/valid? ::string-in-list? ["abc" ["abc" "def"]]) is TRUE
+;; (s/valid? ::string-in-list? ["abc" ["qed" "pdq" "rfd"]]) is FALSE
+;;
+;; Note: this (gen/generate (s/gen ::string-in-list?)) fails with:
+;; ExceptionInfo Couldn't satisfy such-that predicate after 100 tries.
+;;
+;; Which suggests the need for a custom generator in this case
+;;
+;; Note, there's a useful video about custom generators here:
+;; http://blog.cognitect.com/blog/2016/8/10/clojure-spec-screencast-customizing-generators
+;; or a string that's a member of a given list...
+(s/def ::string-in-list?
+  (s/and (s/cat :needle string? :haystack vector?)
+         #(some (fn [item] (= (:needle %) item))
+                (:haystack %))))
+
+;; Also note style above: (some (fn [item] (= "abc" item)) ["qed"])
+;; returns nil, but the test nicely handles that and returns false
+;; in the corresponding case
 
 ;; PositiveInteger.java
 
-(defn test-integer-positive
-  "."
-  [x]
-  {:pre [(integer? x)]
-   :post [(boolean? %)]}
-  (> x 0))
+(s/def ::positive-integer?
+  (s/and integer? #(> % 0)))
 
 ;; NonNegativeInteger.java
 
-(defn test-integer-nonnegative
-  "."
-  [x]
-  {:pre [(integer? x)]
-   :post [(boolean? %)]}
-  (>= x 0))
+(s/def ::nonnegative-integer?
+  (s/and integer? #(>= % 0)))
 
 ;; IntAsString.java
 
-(defn test-string-represents-integer
-  "Examples: \"123\" represents an integer, \"12a\" does not."
-  [x]
-  {:pre [(string? x)]
-   :post [(boolean? %)]}
-  (try (do (Integer/parseInt x)
-           true)
-       (catch NumberFormatException e false)))
+;; Note: this (gen/generate (s/gen ::string-represents-integer?))
+;; only works intermittently, generating short integer-strings like "3"
+
+(s/def ::string-represents-integer?
+  (s/and string?
+         #(try (do (Integer/parseInt %)
+                   true)
+               (catch NumberFormatException e false))))
 
 ;; IntAsStringOrAll.java
 ;; This example illustrates one test calling another
 
-(defn test-string-integer-or-all
-  "Allow a string that represents an integer, or the literal \"all\"."
-  [x]
-  {:pre [(string? x)]
-   :post [(boolean? %)]}
-  (or (test-string-represents-integer x)
-      (= "all" x)))
+(s/def ::string-integer-or-all?
+  (s/or :int ::string-represents-integer?
+        :all #(= "all" %)))
 
 ;; IntInRange.java
 
-(defn test-integer-in-range
-  "."
-  [x y z]
-  {:pre [(integer? x) (integer? y) (integer? z)]
-   :post [(boolean? %)]}
-  (and (>= x y)
-       (<= x z)))
+(s/def ::integer-in-range?
+  (s/and (s/cat :target integer? :bottom integer? :top integer?)
+         #(and (>= (:target %) (:bottom %))
+               (<= (:target %) (:top %)))))
 
 ;; FloatInRange.java
 ;; For now assuming the range is defined by integers, which is a little weird
 
-(defn test-float-in-range
-  "."
-  [x y z]
-  {:pre [(float? x) (integer? y) (integer? z)]
-   :post [(boolean? %)]}
-  (and (>= x y)
-       (<= x z)))
+(s/def ::float-in-range?
+  (s/and (s/cat :target float? :bottom integer? :top integer?)
+         #(and (>= (:target %) (:bottom %))
+               (<= (:target %) (:top %)))))
 
 ;; IntLessThan.java
 
-(defn test-integer-less-than
-  "."
-  [x y]
-  {:pre [(integer? x) (integer? y)]
-   :post [(boolean? %)]}
-  (< x y))
+(s/def ::integer-less-than?
+  (s/and (s/cat :target integer? :top integer?)
+         #(< (:target %) (:top %))))
 
 ;; IntLeqThan.java
 
-(defn test-integer-less-than-or-equal
-  "."
-  [x y]
-  {:pre [(integer? x) (integer? y)]
-   :post [(boolean? %)]}
-  (<= x y))
+(s/def ::integer-less-than-or-equal?
+  (s/and (s/cat :target integer? :top integer?)
+         #(<= (:target %) (:top %))))
 
 ;; IntGreaterThan.java
 
-(defn test-integer-greater-than
-  "."
-  [x y]
-  {:pre [(integer? x) (integer? y)]
-   :post [(boolean? %)]}
-  (> x y))
+(s/def ::integer-greater-than?
+  (s/and (s/cat :target integer? :bottom integer?)
+         #(> (:target %) (:bottom %))))
 
 ;; IntGeqThan.java
 
-(defn test-integer-greater-than-or-equal
-  "."
-  [x y]
-  {:pre [(integer? x) (integer? y)]
-   :post [(boolean? %)]}
-  (>= x y))
+(s/def ::integer-greater-than-or-equal?
+  (s/and (s/cat :target integer? :bottom integer?)
+         #(>= (:target %) (:bottom %))))
 
 ;; IsWord.java
 ;; We could write a more robust variant of this function that checks
 ;; e.g. whether the word is in wordnet.  (Note that Wordnet does
 ;; not contain all words, e.g. it doesn't contain pronouns.)
 
-(defn word?
-  "Allow a string that represents a word, defined by not containing spaces."
-  [x]
-  {:pre [(string? x)]
-   :post [(boolean? %)]}
-  (if (some #(= \space %) (seq x))
-    false
-    true))
+(s/def ::word?
+  (s/and string?
+         #(> (count (seq %)) 0)
+         #(not (some (fn [char] (= \space char))
+                     (seq %)))))
 
-;; This is an example of a test whose precondition is defined in terms of
-;; another test - this shows that we're effectively doing a kind of subtyping.
-(defn noun?
-  "Allow a word that has a noun sense."
-  [x]
-  {:pre [(word? x)]
-   :post [(boolean? %)]}
-  (if (empty? (flowrweb.core/wordnet x :noun))
-    false
-    true))
+;; For now we will insist that a phrase contains no double spaces;
+;; (Do we want anything else?)
+(s/def ::phrase?
+  (s/and string?
+         #(every? (fn [term] (s/valid? ::word? term))
+                  (str/split % #" "))))
 
-(defn verb?
-  "Allow a word that has a verb sense."
-  [x]
-  {:pre [(word? x)]
-   :post [(boolean? %)]}
-  (if (empty? (flowrweb.core/wordnet x :verb))
-    false
-    true))
+;; another example where we might want a custom generator
+(s/def ::semicolon-separated-phrases?
+  (s/and string?
+         #(every? (fn [term] (s/valid? ::phrase? term))
+                  (str/split % #"; ?"))))
+
+;; This is an example of a test whose precondition is defined in terms
+;; of another test, which shows how we're effectively doing a kind of
+;; subtyping.
+;;
+;; This example is also somewhat "knowledge-based", in that it refers
+;; to an imported function.
+;; e.g. "dog" "cat" etc.
+(s/def ::noun?
+  (s/and ::word?
+         #(not (empty? (flowrweb.core/wordnet % :noun)))))
+
+;; e.g. "run" "help" etc.
+(s/def ::verb?
+  (s/and ::word?
+         #(not (empty? (flowrweb.core/wordnet % :verb)))))
 
 ;; ExclamSeparatedWords.java
 
-(defn test-string-!-separated-words
-  "."
-  [x]
-  {:pre [(string? x)]
-   :post [(boolean? %)]}
-  (loop [items (str/split x #"!!")]
-    ;; if there are no more items left, then we've successfully made it to the end of the list
-    (if (empty? items)
-      true
-      ;; otherwise, test the next item and proceed accordingly
-      (if (word? (first items))
-        (recur (rest items))
-        false))))
+;; unless we have a more restrictive definition of words,
+;; then this isn't a very meaningful predicate
+; (s/def ::!!-separated-words? ::word?)
+
+;; Let's try something more in the spirit of this module,
+;; and worry about modeling the precise details of FloWr
+;; data later
+
+(s/def ::words?
+  (s/* ::word?))
 
 ;; ExclamSeparatedInts.java
 
-(defn test-string-!-separated-ints
-  "."
-  [x]
-  {:pre [(string? x)]
-   :post [(boolean? %)]}
-  (loop [items (str/split x #"!!")]
-    (if (empty? items)
-      true
-      (if (test-string-represents-integer (first items))
-        (recur (rest items))
-        false))))
+(s/def ::strints?
+  (s/* ::string-represents-integer?))
 
 ;; ExclamSeparatedIntsOrAll.java
 
-(defn test-string-!-separated-ints-or-all
-  "x is a string that is either a !! list of integers or the singular symbol \"all\"."
-  [x]
-  {:pre [(string? x)]
-   :post [(boolean? %)]}
-  (if (= x "all")
-    true
-    (loop [items (str/split x #"!!")]
-      (if (empty? items)
-        true
-        (if (test-string-represents-integer (first items))
-          (recur (rest items))
-          false)))))
-
-;; SemicolonSeparatedWords.java
-
-(defn test-string-semicolon-separated-words
-  "."
-  [x]
-  {:pre [(string? x)]
-   :post [(boolean? %)]}
-  (loop [items (str/split x #";")]
-    (if (empty? items)
-      true
-      (if (word? (first items))
-        (recur (rest items))
-        false))))
-
-;; A space-separated list of words is a phrase.
-;; (Will this ever fail?)
-(defn test-string-is-phrase
-  "."
-  [x]
-  {:pre [(string? x)]
-   :post [(boolean? %)]}
-  (loop [items (str/split x #" ")]
-    (if (empty? items)
-      true
-      (if (word? (first items))
-        (recur (rest items))
-        false))))
-
-(defn test-string-semicolon-separated-phrases
-  "."
-  [x]
-  {:pre [(string? x)]
-   :post [(boolean? %)]}
-  (loop [items (str/split x #";")]
-    (if (empty? items)
-      true
-      (if (test-string-is-phrase (first items))
-        (recur (rest items))
-        false))))
-
-;; ExclamSeparatedItemsFromList.java
-;; here we might further want to guarantee that y is a list of strings...
-
-(defn test-string-!-separated-items-from-list
-  "."
-  [x y]
-  {:pre [(string? x)
-         (vector? y)]
-   :post [(boolean? %)]}
-  (loop [items (str/split x #"!!")]
-    (if (empty? items)
-      true
-      (if (test-string-in-list (first items) y)
-        (recur (rest items))
-        false))))
+(s/def ::strints-or-all?
+  (s/or :all #(= "all" %)
+        :strints ::strints?))
 
 ;; IntMinimizesTuplesLengths.java
 
-(defn test-integer-minimises-tuples-lengths
-  "."
-  [x y]
-  {:pre [(integer? x)
-         (vector? y)
-         (every? vector? y)]
-   :post [(boolean? %)]}
-  ;; note that if we didn't put x in here, we could use this function
-  ;; to test whether the vector y had monotonically incleaning length
-  (apply < x (map count y)))
+;; Let's build this one up in two steps
 
-;; UnderscoreSeparatedWords.java
+(s/def ::vector-of-vectors?
+  (s/* vector?))
 
-(defn test-string-semicolon-separated-words
-  "."
-  [x]
-  {:pre [(string? x)]
-   :post [(boolean? %)]}
-  (loop [items (str/split x #"_")]
-    (if (empty? items)
-      true
-      (if (word? (first items))
-        (recur (rest items))
-        false))))
+(s/def ::integer-minimises-tuples-lengths?
+  (s/and (s/cat :int integer? :vec ::vector-of-vectors?)
+         #(apply < (:int %) (map count (:vec %)))))
 
 ;; FloatAsString.java
 
-(defn test-string-represents-float
-  "Examples: \"1.23\" represents an float, \"12a.23\" does not."
-  [x]
-  {:pre [(string? x)]
-   :post [(boolean? %)]}
-  (try (do (Float/parseFloat x)
-           true)
-       (catch NumberFormatException e false)))
-
-;; EachOne.java
-
-(defn test-each-one
-  "x is a test, y is a vector, and every element of y satisfies the test x"
-  [x y]
-  {:pre [(test/function? x)
-         (vector? y)]
-   :post [(boolean? %)]}
-  (every? x y))
-
-;; EachOneInPlaces.java
-
-(defn test-each-one-in-places
-  "x is a test, y is a vector, z denotes the places in y that must pass the test x."
-  [x y z]
-  {:pre [(test/function? x)
-         (vector? y)
-         (test-string-!-separated-ints-or-all z)]
-   :post [(boolean? %)]}
-  (if (= z "all")
-    (test-each-one x y)
-    ;; convert the denoted integers to genuine integers
-    (let [indices (map #(Integer/parseInt %) (str/split z #"!!"))]
-      ;; retain the items in matching places, and apply the test to them
-      ;; see: http://stackoverflow.com/questions/7744656/how-do-i-filter-elements-from-a-sequence-based-on-indexes
-      ;; http://www.spacjer.com/blog/2015/11/24/lesser-known-clojure-keep-and-keep-indexed-functions/
-      (test-each-one x (into [] (keep-indexed #(when ((set indices) %1) %2) y))))))
+(s/def ::string-represents-float?
+  (s/and string?
+         #(try (do (Float/parseFloat %)
+                   true)
+               (catch NumberFormatException e false))))
 
 ;; SelectionFrom.java
 
-;; e.g. could use a value like percentage of overlap here
-(defn test-selection-from
-  "x is a vector, y is a vector that should be entirely comprised of elements selected from x."
-  [x y]
-  {:pre [(vector? x)
-         (vector? y)]
-   :post [(boolean? %)]}
-  (set/subset? (set y) (set x)))
+;; e.g. we could potentially use a value like percentage of overlap
+;; if we wanted to deal with non-binary inclusion
+
+(s/def ::selection-from?
+  (s/and (s/cat :sub vector? :super vector?)
+         #(set/subset? (set (:sub %)) (set (:super %)))))
+
+;;; Some things I'll skip in this edition
+
+;; UnderscoreSeparatedWords.java
+;; skip this for now
+
+;; EachOne.java
+;; I'm not totally convinced we'll ever need this;
+;; if we do, can't we just use plain old `every?`
+;; ...or go about it some other way?
+;; Check out the earlier implementation if needed
+
+;; EachOneInPlaces.java
+;; Again not totally convinced, but we have the earlier implementation
+;; if it ever proves useful
+
+;; SemicolonSeparatedWords.java
+
+;; skip this, we can just use ::words?
+
+;; A space-separated list of words is a phrase.
+;; (Will this ever fail?)
+;; Again, let's skip it for now
+
+;; ExclamSeparatedItemsFromList.java
+;; here we might further want to guarantee that y is a list of strings...
+;; skip this for now
 
